@@ -1,21 +1,20 @@
 import requests
 import json
 
-API_URL = "https://www.diving-fish.com/api/maimaidxprober/player/records"
+API_URL = "https://www.diving-fish.com/api/maimaidxprober/query/player"
+
 
 def fetch_player_scores(import_token: str):
     headers = {
-        "Content-Type": "application/json",
-        "Import-Token": import_token  # 将 Import-Token 放入 headers
+        "Content-Type": "application/json"
+    }
+    data = {
+        "token": import_token
     }
 
-    response = requests.get(API_URL, headers=headers)  # 使用 GET 请求
+    response = requests.post(API_URL, headers=headers, data=json.dumps(data))
 
     if response.status_code == 200:
         return response.json()
     else:
-        try:
-            error_message = response.json().get("message", response.text)
-        except:
-            error_message = response.text
-        raise Exception(f"请求失败：{response.status_code}, {error_message}")
+        raise Exception(f"请求失败：{response.status_code}, {response.text}")

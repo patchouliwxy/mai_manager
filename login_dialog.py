@@ -1,7 +1,6 @@
 import json
 import os
 from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QMessageBox
-from divingfish_api import fetch_player_scores
 
 CONFIG_PATH = "config.json"
 
@@ -41,17 +40,12 @@ class LoginDialog(QDialog):
 
     def accept_and_save(self):
         token = self.get_token()
-        if not token:
-            QMessageBox.warning(self, "警告", "请输入有效的 Token。")
-            return
-        try:
-            # 验证 Token 是否有效
-            fetch_player_scores(token)
+        if token:
             save_token(token)
-            QMessageBox.information(self, "成功", "Token 验证通过并已保存！")
+            QMessageBox.information(self, "成功", "Token 已保存！")
             self.accept()
-        except Exception as e:
-            QMessageBox.critical(self, "错误", f"Token 验证失败：{str(e)}")
+        else:
+            QMessageBox.warning(self, "警告", "请输入有效的 Token。")
 
     def get_token(self):
         return self.token_input.text().strip()

@@ -26,11 +26,10 @@ class ScoreQueryTab(QWidget):
     def sync_from_divingfish(self):
         token, ok = QInputDialog.getText(self, "导入Token", "请输入 Import-Token：")
         if not ok or not token:
-            QMessageBox.warning(self, "警告", "请输入有效的 Token。")
             return
         try:
             result = fetch_player_scores(token)
-            self.score_data = result.get("records", [])  # 获取 records 字段
+            self.score_data = result.get("charts", [])  # 这是一个列表
             self.display_scores(self.score_data)
         except Exception as e:
             QMessageBox.critical(self, "同步失败", str(e))
@@ -46,13 +45,13 @@ class ScoreQueryTab(QWidget):
 
         for row, item in enumerate(scores):
             self.table.setItem(row, 0, QTableWidgetItem(item.get("title", "")))
-            self.table.setItem(row, 1, QTableWidgetItem(item.get("level_label", "")))  # 使用 level_label
+            self.table.setItem(row, 1, QTableWidgetItem(item.get("type", "")))  # Basic/Advanced...
             self.table.setItem(row, 2, QTableWidgetItem(str(item.get("level", ""))))
             self.table.setItem(row, 3, QTableWidgetItem(str(item.get("achievements", ""))))
             self.table.setItem(row, 4, QTableWidgetItem(item.get("rate", "")))
             self.table.setItem(row, 5, QTableWidgetItem(item.get("fc", "-")))
             self.table.setItem(row, 6, QTableWidgetItem(item.get("fs", "-")))
-            self.table.setItem(row, 7, QTableWidgetItem("app" if item.get("fc") in ["ap", "app"] else "-"))
+            self.table.setItem(row, 7, QTableWidgetItem(item.get("fullcombo", "-")))
 
     def export_csv(self):
         if not self.score_data:
@@ -70,12 +69,12 @@ class ScoreQueryTab(QWidget):
             for item in self.score_data:
                 writer.writerow([
                     item.get("title", ""),
-                    item.get("level_label", ""),
+                    item.get("type", ""),
                     item.get("level", ""),
                     item.get("achievements", ""),
                     item.get("rate", ""),
                     item.get("fc", "-"),
                     item.get("fs", "-"),
-                    "app" if item.get("fc") in ["ap", "app"] else "-"
+                    item.get("fullcombo", "-")
                 ])
         QMessageBox.information(self, "成功", "CSV 文件已导出！")
