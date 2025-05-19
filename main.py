@@ -7,7 +7,6 @@ from song_tab import SongSearchTab
 from favorite_tab import FavoriteTab
 from score_tab import ScoreQueryTab
 from login_dialog import LoginDialog
-
 import sys
 
 class MainWindow(QMainWindow):
@@ -19,7 +18,7 @@ class MainWindow(QMainWindow):
         # 导入数据
         self.song_data = load_song_data("maidata.json")
 
-        # ---------- 上方工具栏 ----------
+        # 上方工具栏
         top_bar = QWidget()
         top_layout = QHBoxLayout()
         top_layout.setContentsMargins(10, 5, 10, 5)
@@ -42,17 +41,17 @@ class MainWindow(QMainWindow):
 
         top_bar.setLayout(top_layout)
 
-        # ---------- 主体 Tab ----------
+        # 主体 Tab
         self.tabs = QTabWidget()
         self.song_tab = SongSearchTab(self.song_data)
         self.favorite_tab = FavoriteTab(self.song_data)
-        self.score_tab = ScoreQueryTab()
+        self.score_tab = ScoreQueryTab(self.song_data)  # 传递 song_data
 
         self.tabs.addTab(self.song_tab, "🎵 乐曲查询")
         self.tabs.addTab(self.favorite_tab, "⭐ 收藏夹")
         self.tabs.addTab(self.score_tab, "📊 成绩查询")
 
-        # ---------- 主体布局 ----------
+        # 主体布局
         central_widget = QWidget()
         central_layout = QVBoxLayout()
         central_layout.setContentsMargins(0, 0, 0, 0)
@@ -71,7 +70,6 @@ class MainWindow(QMainWindow):
     def goto_favorite_tab(self):
         self.tabs.setCurrentWidget(self.favorite_tab)
 
-# ---------- 启动 ----------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
