@@ -1,7 +1,12 @@
+# favorite_tab.py
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTableView, QMessageBox
 from PyQt5.QtCore import QSize
 from song_model import SongTableModel
 from favorites_manager import load_favorites, toggle_favorite
+import logging  # 添加日志记录
+
+# 设置日志
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class FavoriteTab(QWidget):
     def __init__(self, full_data):
@@ -33,15 +38,19 @@ class FavoriteTab(QWidget):
         self.model.layoutChanged.emit()
 
     def show_song_detail(self, index):
-        row = index.row()
-        song = self.model.get_song(row)
-        if not song:
-            return
+        try:
+            row = index.row()
+            song = self.model.get_song(row)
+            if not song:
+                logging.warning(f"No song found at row {row}")
+                QMessageBox.warning(self, "错误", "无法获取乐曲信息")
+                return
 
-        song_id = f"{song['title']}|{song['chart_type']}"
-        is_favorited = song_id in self.model.favorites
+            song_id = f"{song['title']}|{song['chart_type']}"
+            is_favorited = song_id in self.model.favorites
+            logging.debug(f"Showing details for song_id: {song_id}, favorited: {is_favorited}")
 
-        detail = f"""🎵 {song.get('title', '')}
+            detail = f"""🎵 {song.get('title', '')}
 👤 艺术家: {song.get('artist', '')}
 📂 类别: {song.get('category', '')}
 🕹️ 版本: {song.get('version', '')}
@@ -53,13 +62,19 @@ Expert: {song.get('Expert', '-')}, Master: {song.get('Master', '-')},
 Re:Mas: {song.get('Re:Mas', '-')}
 """
 
-        msg = QMessageBox(self)
-        msg.setWindowTitle("乐曲详情")
-        msg.setText(detail)
-        fav_btn = msg.addButton("☆ 取消收藏", QMessageBox.ActionRole)
-        msg.addButton("关闭", QMessageBox.RejectRole)
-        msg.exec_()
+            msg = QMessageBox(self)
+            msg.setWindowTitle("乐曲详情")
+            msg.setText(detail)
+            fav_btn = msg.addButton("☆ 取消收藏", QMessageBox.ActionRole)
+            msg.addButton("关闭", QMessageBox.RejectRole)
+            msg.exec_()
 
-        if msg.clickedButton() == fav_btn:
-            toggle_favorite(song_id)
-            self.refresh()
+            if msg.clickedButton() == fav_btn:
+                logging.debug(f"Toggling favorite for song_id: {song_id}")
+                toggle_favorite(song_id)
+                self.refresh()
+                logging.info(f"Favorite toggled and refreshed for song_id: {song_id}")
+
+        except Exception as e:
+            logging.error(f"Error in show_song_detail: {str(e)}", exc_info=True)
+            QMessageBox.critical(self, "错误", f"显示乐曲详情时出错：{str(e)}")

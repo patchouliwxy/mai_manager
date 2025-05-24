@@ -1,3 +1,4 @@
+# song_tab.py
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLineEdit, QTableView, QMessageBox, QPushButton, QHBoxLayout
 )
@@ -7,10 +8,11 @@ from favorites_manager import toggle_favorite, load_favorites
 from filter_dialog import FilterDialog
 
 class SongSearchTab(QWidget):
-    def __init__(self, song_data):
-        super().__init__()
+    def __init__(self, song_data, parent=None):  # 添加 parent 参数
+        super().__init__(parent)
         self.full_data = song_data
         self.model = SongTableModel(song_data)
+        self.parent = parent  # 保存 MainWindow 引用
 
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("输入曲目标题或艺术家搜索")
@@ -95,3 +97,6 @@ Re:Mas: {song.get('Re:Mas', '-')}
             new_state = toggle_favorite(song_id)
             self.model.favorites = load_favorites()
             self.model.layoutChanged.emit()
+            # 刷新收藏夹
+            if self.parent:
+                self.parent.refresh_favorite_tab()

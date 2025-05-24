@@ -1,19 +1,17 @@
+# score_tab.py
 from PyQt5 import Qt
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QFileDialog, QInputDialog, QMessageBox, QLineEdit, QLabel
 )
-from PyQt5.QtGui import QPixmap, QIcon
-from PyQt5.QtCore import QSize
 from divingfish_api import fetch_player_scores
 from song_data_loader import load_song_data
-import os
+from login_dialog import load_scores  # 导入 load_scores
 
 class ScoreQueryTab(QWidget):
     def __init__(self, song_data=None):
         super().__init__()
-        self.song_data = song_data or load_song_data("maidata.json")  # 加载歌曲数据
-        self.image_dir = "covers"  # 封面图片目录
+        self.song_data = song_data or load_song_data("maidata.json")
         layout = QVBoxLayout()
 
         # 搜索框
@@ -38,14 +36,25 @@ class ScoreQueryTab(QWidget):
 
         # 成绩表格
         self.table = QTableWidget()
-        self.table.setIconSize(QSize(64, 64))
         self.table.verticalHeader().setDefaultSectionSize(72)
         layout.addWidget(self.table)
 
         self.setLayout(layout)
-        self.score_data = []  # 存储 records 字段
-        self.raw_data = {}   # 存储完整原始数据
-        self.filtered_data = []  # 存储过滤后的成绩数据
+        self.score_data = []
+        self.raw_data = {}
+        self.filtered_data = []
+
+        # 初始化时加载保存的成绩
+        saved_data = load_scores()
+        if saved_data:
+            self.raw_data = saved_data
+            self.score_data = saved_data.get("records", [])
+            self.filtered_data = self.score_data
+            self.user_info_label.setText(
+                f"用户信息: {self.raw_data.get('nickname', '未知')} "
+                f"(Rating: {self.raw_data.get('rating', 0)})"
+            )
+            self.display_scores(self.filtered_data)
 
     def sync_from_divingfish(self):
         token, ok = QInputDialog.getText(self, "导入Token", "请输入 Import-Token：")
@@ -56,8 +65,7 @@ class ScoreQueryTab(QWidget):
             result = fetch_player_scores(token)
             self.raw_data = result
             self.score_data = result.get("records", [])
-            self.filtered_data = self.score_data  # 初始化过滤数据
-            # 更新用户信息标签
+            self.filtered_data = self.score_data
             self.user_info_label.setText(
                 f"用户信息: {self.raw_data.get('nickname', '未知')} "
                 f"(Rating: {self.raw_data.get('rating', 0)})"
@@ -85,17 +93,9 @@ class ScoreQueryTab(QWidget):
         self.display_scores(self.filtered_data)
 
     def get_artist(self, title, chart_type):
-        """根据歌曲标题和谱面类型查找艺术家"""
         for song in self.song_data:
             if song.get("title") == title and song.get("chart_type") == chart_type.lower():
                 return song.get("artist", "")
-        return ""
-
-    def get_image_file(self, title, chart_type):
-        """根据歌曲标题和谱面类型查找封面图片文件名"""
-        for song in self.song_data:
-            if song.get("title") == title and song.get("chart_type") == chart_type.lower():
-                return song.get("image_file", "")
         return ""
 
     def display_scores(self, scores):
@@ -103,54 +103,32 @@ class ScoreQueryTab(QWidget):
             QMessageBox.information(self, "提示", "未获取到任何成绩。")
             return
         headers = [
-            "谱面类型", "封面", "歌曲标题", "难度索引", "等级", "定数",
+            "谱面类型", "歌曲标题", "难度索引", "等级", "定数",
             "成绩百分比", "评级", "FC", "FS", "单曲 Rating", "DX 分数"
         ]
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.setRowCount(len(scores))
-        self.table.setColumnWidth(1, 80)  # 封面列宽度
         self.table.setColumnWidth(0, 60)  # 谱面类型
-        self.table.setColumnWidth(3, 80)  # 难度索引
-        self.table.setColumnWidth(4, 60)  # 等级
-        self.table.setColumnWidth(5, 60)  # 定数
-        self.table.setColumnWidth(6, 100) # 成绩百分比
-        self.table.setColumnWidth(10, 100) # 单曲 Rating
-        self.table.setColumnWidth(11, 100) # DX 分数
+        self.table.setColumnWidth(2, 80)  # 难度索引
+        self.table.setColumnWidth(3, 60)  # 等级
+        self.table.setColumnWidth(4, 60)  # 定数
+        self.table.setColumnWidth(5, 100) # 成绩百分比
+        self.table.setColumnWidth(9, 100)  # 单曲 Rating
+        self.table.setColumnWidth(10, 100) # DX 分数
 
         for row, item in enumerate(scores):
-            # 谱面类型
             self.table.setItem(row, 0, QTableWidgetItem(item.get("type", "")))
-            # 封面
-            image_file = self.get_image_file(item.get("title", ""), item.get("type", ""))
-            if image_file:
-                path = os.path.join(self.image_dir, image_file)
-                if os.path.exists(path):
-                    pixmap = QPixmap(path).scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    self.table.setItem(row, 1, QTableWidgetItem())
-                    self.table.item(row, 1).setIcon(QIcon(pixmap))
-            else:
-                self.table.setItem(row, 1, QTableWidgetItem())
-            # 歌曲标题
-            self.table.setItem(row, 2, QTableWidgetItem(item.get("title", "")))
-            # 难度索引
-            self.table.setItem(row, 3, QTableWidgetItem(str(item.get("level_index", ""))))
-            # 谱面等级
-            self.table.setItem(row, 4, QTableWidgetItem(item.get("level", "")))
-            # 谱面定数
-            self.table.setItem(row, 5, QTableWidgetItem(str(item.get("ds", ""))))
-            # 成绩百分比
-            self.table.setItem(row, 6, QTableWidgetItem(str(item.get("achievements", ""))))
-            # 评级
-            self.table.setItem(row, 7, QTableWidgetItem(item.get("rate", "")))
-            # FC 状态
-            self.table.setItem(row, 8, QTableWidgetItem(item.get("fc", "-")))
-            # FS 状态
-            self.table.setItem(row, 9, QTableWidgetItem(item.get("fs", "-")))
-            # 单曲 Rating
-            self.table.setItem(row, 10, QTableWidgetItem(str(item.get("ra", ""))))
-            # DX 分数
-            self.table.setItem(row, 11, QTableWidgetItem(str(item.get("dxScore", ""))))
+            self.table.setItem(row, 1, QTableWidgetItem(item.get("title", "")))
+            self.table.setItem(row, 2, QTableWidgetItem(str(item.get("level_index", ""))))
+            self.table.setItem(row, 3, QTableWidgetItem(item.get("level", "")))
+            self.table.setItem(row, 4, QTableWidgetItem(str(item.get("ds", ""))))
+            self.table.setItem(row, 5, QTableWidgetItem(str(item.get("achievements", ""))))
+            self.table.setItem(row, 6, QTableWidgetItem(item.get("rate", "")))
+            self.table.setItem(row, 7, QTableWidgetItem(item.get("fc", "-")))
+            self.table.setItem(row, 8, QTableWidgetItem(item.get("fs", "-")))
+            self.table.setItem(row, 9, QTableWidgetItem(str(item.get("ra", ""))))
+            self.table.setItem(row, 10, QTableWidgetItem(str(item.get("dxScore", ""))))
 
     def export_csv(self):
         if not self.score_data:
@@ -164,14 +142,12 @@ class ScoreQueryTab(QWidget):
         import csv
         with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            # 添加用户基本信息
             writer.writerow(["用户名", self.raw_data.get("username", "")])
             writer.writerow(["昵称", self.raw_data.get("nickname", "")])
             writer.writerow(["段位", self.raw_data.get("additional_rating", 0)])
             writer.writerow(["牌子", self.raw_data.get("plate", "")])
             writer.writerow(["总 Rating", self.raw_data.get("rating", 0)])
-            writer.writerow([])  # 空行分隔
-            # 添加成绩数据
+            writer.writerow([])
             writer.writerow([
                 "谱面类型", "歌曲标题", "难度索引", "等级", "定数",
                 "成绩百分比", "评级", "FC", "FS", "单曲 Rating", "DX 分数"

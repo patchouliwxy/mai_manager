@@ -1,3 +1,4 @@
+# main.py
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QHBoxLayout,
     QVBoxLayout, QLabel, QPushButton, QSpacerItem, QSizePolicy
@@ -29,12 +30,10 @@ class MainWindow(QMainWindow):
 
         top_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
-        # 收藏夹按钮
         fav_btn = QPushButton("收藏夹")
         fav_btn.clicked.connect(self.goto_favorite_tab)
         top_layout.addWidget(fav_btn)
 
-        # 登录按钮
         login_btn = QPushButton("登录")
         login_btn.clicked.connect(self.open_login)
         top_layout.addWidget(login_btn)
@@ -43,9 +42,9 @@ class MainWindow(QMainWindow):
 
         # 主体 Tab
         self.tabs = QTabWidget()
-        self.song_tab = SongSearchTab(self.song_data)
+        self.song_tab = SongSearchTab(self.song_data, self)  # 传递 self
         self.favorite_tab = FavoriteTab(self.song_data)
-        self.score_tab = ScoreQueryTab(self.song_data)  # 传递 song_data
+        self.score_tab = ScoreQueryTab(self.song_data)
 
         self.tabs.addTab(self.song_tab, "🎵 乐曲查询")
         self.tabs.addTab(self.favorite_tab, "⭐ 收藏夹")
@@ -69,6 +68,10 @@ class MainWindow(QMainWindow):
 
     def goto_favorite_tab(self):
         self.tabs.setCurrentWidget(self.favorite_tab)
+        self.favorite_tab.refresh()  # 进入收藏夹时刷新
+
+    def refresh_favorite_tab(self):
+        self.favorite_tab.refresh()  # 提供给其他模块调用的刷新方法
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
