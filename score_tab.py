@@ -2,11 +2,12 @@
 from PyQt5 import Qt
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QFileDialog, QInputDialog, QMessageBox, QLineEdit, QLabel
+    QPushButton, QFileDialog, QMessageBox, QLineEdit, QLabel
 )
-from divingfish_api import fetch_player_scores
+import requests
+from divingfish_api import fetch_player_scores, login
 from song_data_loader import load_song_data
-from login_dialog import load_scores  # 导入 load_scores
+from login_dialog import load_scores, LoginDialog
 
 class ScoreQueryTab(QWidget):
     def __init__(self, song_data=None):
@@ -14,27 +15,22 @@ class ScoreQueryTab(QWidget):
         self.song_data = song_data or load_song_data("maidata.json")
         layout = QVBoxLayout()
 
-        # 搜索框
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("输入曲目标题或艺术家搜索")
         self.search_box.textChanged.connect(self.apply_search)
         layout.addWidget(self.search_box)
 
-        # 同步按钮
         self.sync_btn = QPushButton("📡 从水鱼查分器同步成绩")
         self.sync_btn.clicked.connect(self.sync_from_divingfish)
         layout.addWidget(self.sync_btn)
 
-        # 导出 CSV 按钮
         self.export_btn = QPushButton("💾 导出为 CSV")
         self.export_btn.clicked.connect(self.export_csv)
         layout.addWidget(self.export_btn)
 
-        # 用户信息标签
         self.user_info_label = QLabel("用户信息: 未同步")
         layout.addWidget(self.user_info_label)
 
-        # 成绩表格
         self.table = QTableWidget()
         self.table.verticalHeader().setDefaultSectionSize(72)
         layout.addWidget(self.table)
@@ -44,7 +40,6 @@ class ScoreQueryTab(QWidget):
         self.raw_data = {}
         self.filtered_data = []
 
-        # 初始化时加载保存的成绩
         saved_data = load_scores()
         if saved_data:
             self.raw_data = saved_data
@@ -57,28 +52,31 @@ class ScoreQueryTab(QWidget):
             self.display_scores(self.filtered_data)
 
     def sync_from_divingfish(self):
-        token, ok = QInputDialog.getText(self, "导入Token", "请输入 Import-Token：")
-        if not ok or not token:
-            QMessageBox.warning(self, "警告", "请输入有效的 Token。")
-            return
-        try:
-            result = fetch_player_scores(token)
-            self.raw_data = result
-            self.score_data = result.get("records", [])
-            self.filtered_data = self.score_data
-            self.user_info_label.setText(
-                f"用户信息: {self.raw_data.get('nickname', '未知')} "
-                f"(Rating: {self.raw_data.get('rating', 0)})"
-            )
-            self.display_scores(self.filtered_data)
-        except Exception as e:
-            error_msg = str(e)
-            if "导入token有误" in error_msg:
-                QMessageBox.critical(self, "同步失败", "Import-Token 无效，请检查或重新生成。")
-            elif "已设置隐私或未同意用户协议" in error_msg:
-                QMessageBox.critical(self, "同步失败", "用户已设置隐私或未同意用户协议，请在查分器官网检查设置。")
-            else:
-                QMessageBox.critical(self, "同步失败", str(e))
+        dialog = LoginDialog(self)
+        if dialog.exec_():
+            try:
+                username = dialog.username_input.text().strip()
+                password = dialog.password_input.text().strip()
+                if not username or not password:
+                    QMessageBox.warning(self, "警告", "请输入用户名和密码。")
+                    return
+                session = requests.Session()
+                login(username, password, session)
+                result = fetch_player_scores(session)
+                self.raw_data = result
+                self.score_data = result.get("records", [])
+                self.filtered_data = self.score_data
+                self.user_info_label.setText(
+                    f"用户信息: {self.raw_data.get('nickname', '未知')} "
+                    f"(Rating: {self.raw_data.get('rating', 0)})"
+                )
+                self.display_scores(self.filtered_data)
+            except Exception as e:
+                error_msg = str(e)
+                if "登录失败" in error_msg:
+                    QMessageBox.critical(self, "同步失败", "用户名或密码错误，请检查。")
+                else:
+                    QMessageBox.critical(self, "同步失败", error_msg)
 
     def apply_search(self):
         keyword = self.search_box.text().strip().lower()
@@ -109,13 +107,13 @@ class ScoreQueryTab(QWidget):
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         self.table.setRowCount(len(scores))
-        self.table.setColumnWidth(0, 60)  # 谱面类型
-        self.table.setColumnWidth(2, 80)  # 难度索引
-        self.table.setColumnWidth(3, 60)  # 等级
-        self.table.setColumnWidth(4, 60)  # 定数
-        self.table.setColumnWidth(5, 100) # 成绩百分比
-        self.table.setColumnWidth(9, 100)  # 单曲 Rating
-        self.table.setColumnWidth(10, 100) # DX 分数
+        self.table.setColumnWidth(0, 60)
+        self.table.setColumnWidth(2, 80)
+        self.table.setColumnWidth(3, 60)
+        self.table.setColumnWidth(4, 60)
+        self.table.setColumnWidth(5, 100)
+        self.table.setColumnWidth(9, 100)
+        self.table.setColumnWidth(10, 100)
 
         for row, item in enumerate(scores):
             self.table.setItem(row, 0, QTableWidgetItem(item.get("type", "")))

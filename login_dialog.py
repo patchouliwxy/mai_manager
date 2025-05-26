@@ -1,21 +1,22 @@
 # login_dialog.py
 import json
 import os
+import requests
 from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QMessageBox
-from divingfish_api import fetch_player_scores
+from divingfish_api import fetch_player_scores, login
 
 CONFIG_PATH = "config.json"
-SCORES_PATH = "scores.json"  # 新增成绩保存文件
+SCORES_PATH = "scores.json"
 
 def save_token(token):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump({"import_token": token}, f)
+        json.dump({"jwt_token": token}, f)
 
 def load_token():
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return data.get("import_token")
+            return data.get("jwt_token")
     return None
 
 def save_scores(scores_data):
@@ -32,21 +33,22 @@ class LoginDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("登录水鱼查分器")
-        self.resize(300, 150)
-        self.parent = parent  # 保存父窗口引用
+        self.resize(300, 200)
+        self.parent = parent
 
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("请输入 Import-Token："))
+        layout.addWidget(QLabel("请输入用户名和密码："))
         layout.addWidget(
-            QLabel("请在 https://www.diving-fish.com/maimaidx/prober/ 的‘编辑个人资料’中生成 Import-Token"))
-        self.token_input = QLineEdit()
+            QLabel("请在 https://www.diving-fish.com/maimaidx/prober/ 注册并获取用户名和密码"))
 
-        existing_token = load_token()
-        if existing_token:
-            self.token_input.setText(existing_token)
-            layout.addWidget(QLabel("已检测到保存的 Token。"))
+        layout.addWidget(QLabel("用户名："))
+        self.username_input = QLineEdit()
+        layout.addWidget(self.username_input)
 
-        layout.addWidget(self.token_input)
+        layout.addWidget(QLabel("密码："))
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.Password)
+        layout.addWidget(self.password_input)
 
         self.login_btn = QPushButton("登录")
         self.login_btn.clicked.connect(self.accept_and_save)
@@ -55,16 +57,17 @@ class LoginDialog(QDialog):
         self.setLayout(layout)
 
     def accept_and_save(self):
-        token = self.get_token()
-        if not token:
-            QMessageBox.warning(self, "警告", "请输入有效的 Token。")
+        username = self.username_input.text().strip()
+        password = self.password_input.text().strip()
+        if not username or not password:
+            QMessageBox.warning(self, "警告", "请输入用户名和密码。")
             return
         try:
-            # 验证 Token 并获取成绩
-            scores_data = fetch_player_scores(token)
+            session = requests.Session()
+            token = login(username, password, session)
+            scores_data = fetch_player_scores(session)
             save_token(token)
-            save_scores(scores_data)  # 保存成绩
-            # 自动触发成绩查询页面的同步
+            save_scores(scores_data)
             if hasattr(self.parent, 'score_tab'):
                 self.parent.score_tab.raw_data = scores_data
                 self.parent.score_tab.score_data = scores_data.get("records", [])
@@ -74,10 +77,11 @@ class LoginDialog(QDialog):
                     f"(Rating: {scores_data.get('rating', 0)})"
                 )
                 self.parent.score_tab.display_scores(self.parent.score_tab.filtered_data)
-            QMessageBox.information(self, "成功", "Token 验证通过，成绩已同步并保存！")
+            QMessageBox.information(self, "成功", "登录成功，成绩已同步并保存！")
             self.accept()
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"Token 验证失败：{str(e)}")
-
-    def get_token(self):
-        return self.token_input.text().strip()
+            error_msg = str(e)
+            if "登录失败" in error_msg:
+                QMessageBox.critical(self, "错误", "用户名或密码错误，请检查。")
+            else:
+                QMessageBox.critical(self, "错误", f"登录失败：{error_msg}")

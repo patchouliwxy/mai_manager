@@ -7,7 +7,7 @@ from song_data_loader import load_song_data
 from song_tab import SongSearchTab
 from favorite_tab import FavoriteTab
 from score_tab import ScoreQueryTab
-from login_dialog import LoginDialog
+from login_dialog import LoginDialog # 导入 LoginDialog
 import sys
 
 class MainWindow(QMainWindow):
@@ -42,7 +42,7 @@ class MainWindow(QMainWindow):
 
         # 主体 Tab
         self.tabs = QTabWidget()
-        self.song_tab = SongSearchTab(self.song_data, self)  # 传递 self
+        self.song_tab = SongSearchTab(self.song_data, self)
         self.favorite_tab = FavoriteTab(self.song_data)
         self.score_tab = ScoreQueryTab(self.song_data)
 
@@ -63,15 +63,12 @@ class MainWindow(QMainWindow):
     def open_login(self):
         dialog = LoginDialog(self)
         if dialog.exec_():
-            token = dialog.get_token()
-            print(f"登录成功：{token}")
+            # 登录对话框会处理登录逻辑和成绩同步，这里不需要获取 token
+            # print("登录对话框已关闭。")
+            pass # 登录对话框已完成其任务
 
     def goto_favorite_tab(self):
         self.tabs.setCurrentWidget(self.favorite_tab)
-        self.favorite_tab.refresh()  # 进入收藏夹时刷新
-
-    def refresh_favorite_tab(self):
-        self.favorite_tab.refresh()  # 提供给其他模块调用的刷新方法
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
