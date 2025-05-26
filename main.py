@@ -60,6 +60,8 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(central_layout)
         self.setCentralWidget(central_widget)
 
+    def refresh_favorite_tab(self):
+        self.favorite_tab.refresh()
     def open_login(self):
         dialog = LoginDialog(self)
         if dialog.exec_():
