@@ -1,4 +1,3 @@
-# main.py
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QHBoxLayout,
     QVBoxLayout, QLabel, QPushButton, QSpacerItem, QSizePolicy
@@ -7,7 +6,8 @@ from song_data_loader import load_song_data
 from song_tab import SongSearchTab
 from favorite_tab import FavoriteTab
 from score_tab import ScoreQueryTab
-from login_dialog import LoginDialog # 导入 LoginDialog
+from best50_tab import Best50Tab
+from login_dialog import LoginDialog
 import sys
 
 class MainWindow(QMainWindow):
@@ -45,10 +45,12 @@ class MainWindow(QMainWindow):
         self.song_tab = SongSearchTab(self.song_data, self)
         self.favorite_tab = FavoriteTab(self.song_data)
         self.score_tab = ScoreQueryTab(self.song_data)
+        self.best50_tab = Best50Tab(self.song_data)
 
         self.tabs.addTab(self.song_tab, "🎵 乐曲查询")
         self.tabs.addTab(self.favorite_tab, "⭐ 收藏夹")
         self.tabs.addTab(self.score_tab, "📊 成绩查询")
+        self.tabs.addTab(self.best50_tab, "🏆 Best50")
 
         # 主体布局
         central_widget = QWidget()
@@ -62,12 +64,22 @@ class MainWindow(QMainWindow):
 
     def refresh_favorite_tab(self):
         self.favorite_tab.refresh()
+
     def open_login(self):
         dialog = LoginDialog(self)
         if dialog.exec_():
-            # 登录对话框会处理登录逻辑和成绩同步，这里不需要获取 token
-            # print("登录对话框已关闭。")
-            pass # 登录对话框已完成其任务
+            # 登录对话框已处理成绩同步，刷新Best50页面
+            if hasattr(self, 'best50_tab'):
+                saved_data = dialog.load_scores()
+                if saved_data:
+                    self.best50_tab.raw_data = saved_data
+                    self.best50_tab.score_data = self.best50_tab.get_best50_data(saved_data)
+                    self.best50_tab.filtered_data = self.best50_tab.score_data
+                    self.best50_tab.user_info_label.setText(
+                        f"用户信息: {saved_data.get('nickname', '未知')} "
+                        f"(Rating: {saved_data.get('rating', 0)})"
+                    )
+                    self.best50_tab.display_scores(self.best50_tab.filtered_data)
 
     def goto_favorite_tab(self):
         self.tabs.setCurrentWidget(self.favorite_tab)

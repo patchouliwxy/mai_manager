@@ -77,6 +77,15 @@ class LoginDialog(QDialog):
                     f"(Rating: {scores_data.get('rating', 0)})"
                 )
                 self.parent.score_tab.display_scores(self.parent.score_tab.filtered_data)
+            if hasattr(self.parent, 'best50_tab'):
+                self.parent.best50_tab.raw_data = scores_data
+                self.parent.best50_tab.score_data = self.parent.best50_tab.get_best50_data(scores_data)
+                self.parent.best50_tab.filtered_data = self.parent.best50_tab.score_data
+                self.parent.best50_tab.user_info_label.setText(
+                    f"用户信息: {scores_data.get('nickname', '未知')} "
+                    f"(Rating: {scores_data.get('rating', 0)})"
+                )
+                self.parent.best50_tab.display_scores(self.parent.best50_tab.filtered_data)
             QMessageBox.information(self, "成功", "登录成功，成绩已同步并保存！")
             self.accept()
         except Exception as e:
