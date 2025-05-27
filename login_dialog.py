@@ -2,11 +2,17 @@
 import json
 import os
 import requests
+import sys
 from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QMessageBox
 from divingfish_api import fetch_player_scores, login
 
-CONFIG_PATH = "config.json"
-SCORES_PATH = "scores.json"
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+CONFIG_PATH = resource_path("config.json")
+SCORES_PATH = resource_path("scores.json")
 
 def save_token(token):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:

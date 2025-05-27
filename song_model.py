@@ -1,8 +1,28 @@
+# song_model.py
+import os
+import sys
 from PyQt5.QtCore import QAbstractTableModel, Qt
 from PyQt5.QtGui import QPixmap, QIcon
-import os
 from favorites_manager import load_favorites
 
+def resource_path(relative_path):
+    """获取打包后的资源路径"""
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller 打包后的临时路径
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+class SongTableModel(QAbstractTableModel):
+    def __init__(self, data, image_dir="images"):
+        super().__init__()
+        self._original_data = data
+        self._data = data
+        self.image_dir = resource_path(image_dir)  # 使用动态路径
+        self.headers = [
+            "收藏", "类型", "封面", "标题", "艺术家", "类别", "版本",
+            "Basic", "Advanced", "Expert", "Master", "Re:Mas"
+        ]
+        self.favorites = load_favorites()
 class SongTableModel(QAbstractTableModel):
     def __init__(self, data, image_dir="images"):
         super().__init__()

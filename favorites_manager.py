@@ -1,7 +1,14 @@
+# favorites_manager.py
 import json
 import os
+import sys
 
-FAV_FILE = "favorites.json"
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+FAV_FILE = resource_path("favorites.json")
 
 def load_favorites():
     if not os.path.exists(FAV_FILE):
