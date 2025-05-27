@@ -7,7 +7,7 @@ from song_tab import SongSearchTab
 from favorite_tab import FavoriteTab
 from score_tab import ScoreQueryTab
 from best50_tab import Best50Tab
-from login_dialog import LoginDialog
+from login_dialog import LoginDialog,load_scores
 import sys
 
 class MainWindow(QMainWindow):
@@ -70,7 +70,7 @@ class MainWindow(QMainWindow):
         if dialog.exec_():
             # 登录对话框已处理成绩同步，刷新Best50页面
             if hasattr(self, 'best50_tab'):
-                saved_data = dialog.load_scores()
+                saved_data = load_scores()
                 if saved_data:
                     self.best50_tab.raw_data = saved_data
                     self.best50_tab.score_data = self.best50_tab.get_best50_data(saved_data)
