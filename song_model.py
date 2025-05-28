@@ -3,6 +3,11 @@ import sqlite3
 from PyQt5.QtCore import QAbstractTableModel, Qt
 from PyQt5.QtGui import QPixmap, QIcon
 from favorites_manager import load_favorites
+import json
+import logging
+
+# 设置日志
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class SongTableModel(QAbstractTableModel):
     def __init__(self, data, image_dir="images"):
@@ -80,7 +85,13 @@ class SongTableModel(QAbstractTableModel):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute(query, params)
-        self._data = [json.loads(row[0]) for row in cursor.fetchall()]
+        self._data = []
+        for row in cursor.fetchall():
+            try:
+                self._data.append(json.loads(row[0]))
+            except json.JSONDecodeError as e:
+                logging.error(f"Invalid JSON data in songs table: {row[0]} - Error: {str(e)}")
+                continue
         conn.close()
         self.layoutChanged.emit()
 

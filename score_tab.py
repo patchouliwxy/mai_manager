@@ -17,7 +17,7 @@ class ScoreQueryTab(QWidget):
         layout = QVBoxLayout()
 
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("输入曲目标题或艺术家搜索")
+        self.search_box.setPlaceholderText("输入曲目标题、艺术家、难度或定数搜索")
         self.search_box.textChanged.connect(self.apply_search)
         layout.addWidget(self.search_box)
 
@@ -96,7 +96,9 @@ class ScoreQueryTab(QWidget):
                 self.filtered_data = [
                     item for item in records
                     if (keyword in item.get("title", "").lower() or
-                        keyword in self.get_artist(item.get("title", ""), item.get("type", "")).lower())
+                        keyword in self.get_artist(item.get("title", ""), item.get("type", "")).lower() or
+                        keyword == str(item.get("level", "")).lower() or
+                        keyword == str(item.get("ds", "")).lower())
                 ]
             else:
                 self.filtered_data = []
