@@ -8,6 +8,7 @@ from favorite_tab import FavoriteTab
 from score_tab import ScoreQueryTab
 from best50_tab import Best50Tab
 from login_dialog import LoginDialog, load_scores
+from admin_login_dialog import AdminLoginDialog
 import sys
 
 class MainWindow(QMainWindow):
@@ -15,11 +16,15 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("舞萌DX成绩管理系统")
         self.resize(1200, 800)
+        self.is_admin_logged_in = False
 
-        # 初始化 SQLite 数据库
-        init_song_data("maimai_dx.db")
-        # 导入数据
-        self.song_data = load_song_data("maimai_dx.db")
+        try:
+            # 初始化 SQLite 数据库
+            init_song_data("maimai_dx.db")
+            # 导入数据
+            self.song_data = load_song_data("maimai_dx.db")
+        except Exception as e:
+            raise
 
         # 上方工具栏
         top_bar = QWidget()
@@ -39,6 +44,10 @@ class MainWindow(QMainWindow):
         login_btn = QPushButton("登录")
         login_btn.clicked.connect(self.open_login)
         top_layout.addWidget(login_btn)
+
+        admin_login_btn = QPushButton("管理员登录")
+        admin_login_btn.clicked.connect(self.open_admin_login)
+        top_layout.addWidget(admin_login_btn)
 
         top_bar.setLayout(top_layout)
 
@@ -65,28 +74,50 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
 
     def refresh_favorite_tab(self):
-        self.favorite_tab.refresh()
+        try:
+            self.favorite_tab.refresh()
+        except Exception as e:
+            pass
 
     def open_login(self):
-        dialog = LoginDialog(self)
-        if dialog.exec_():
-            if hasattr(self, 'best50_tab'):
-                saved_data = load_scores()
-                if saved_data:
-                    self.best50_tab.raw_data = saved_data
-                    self.best50_tab.score_data = self.best50_tab.get_best50_data(saved_data)
-                    self.best50_tab.filtered_data = self.best50_tab.score_data
-                    self.best50_tab.user_info_label.setText(
-                        f"用户信息: {saved_data.get('nickname', '未知')} "
-                        f"(Rating: {saved_data.get('rating', 0)})"
-                    )
-                    self.best50_tab.display_scores(self.best50_tab.filtered_data)
+        try:
+            dialog = LoginDialog(self)
+            if dialog.exec_():
+                if hasattr(self, 'best50_tab'):
+                    saved_data = load_scores()
+                    if saved_data:
+                        self.best50_tab.raw_data = saved_data
+                        self.best50_tab.score_data = self.best50_tab.get_best50_data(saved_data)
+                        self.best50_tab.filtered_data = self.best50_tab.score_data
+                        self.best50_tab.user_info_label.setText(
+                            f"用户信息: {saved_data.get('nickname', '未知')} "
+                            f"(Rating: {saved_data.get('rating', 0)})"
+                        )
+                        self.best50_tab.display_scores(self.best50_tab.filtered_data)
+        except Exception as e:
+            pass
+
+    def open_admin_login(self):
+        try:
+            dialog = AdminLoginDialog(self)
+            if dialog.exec_():
+                self.is_admin_logged_in = True
+                if hasattr(self, 'song_tab'):
+                    self.song_tab.refresh_data()
+        except Exception as e:
+            raise
 
     def goto_favorite_tab(self):
-        self.tabs.setCurrentWidget(self.favorite_tab)
+        try:
+            self.tabs.setCurrentWidget(self.favorite_tab)
+        except Exception as e:
+            pass
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
+    try:
+        window = MainWindow()
+        window.show()
+        sys.exit(app.exec_())
+    except Exception as e:
+        raise
