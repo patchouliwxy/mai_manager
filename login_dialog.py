@@ -1,39 +1,47 @@
-# login_dialog.py
 import json
-import os
+import sqlite3
 import requests
-import sys
 from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QPushButton, QVBoxLayout, QMessageBox
 from divingfish_api import fetch_player_scores, login
 
-def resource_path(relative_path):
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+def save_token(token, db_path="maimai_dx.db"):
+    """保存 token 到 SQLite"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)")
+    cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", ("jwt_token", token))
+    conn.commit()
+    conn.close()
 
-CONFIG_PATH = resource_path("config.json")
-SCORES_PATH = resource_path("scores.json")
+def load_token(db_path="maimai_dx.db"):
+    """从 SQLite 加载 token"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT)")
+    cursor.execute("SELECT value FROM config WHERE key = ?", ("jwt_token",))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
 
-def save_token(token):
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump({"jwt_token": token}, f)
+def save_scores(scores_data, db_path="maimai_dx.db"):
+    """保存成绩数据到 SQLite"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS scores (user_id TEXT PRIMARY KEY, data TEXT)")
+    cursor.execute("INSERT OR REPLACE INTO scores (user_id, data) VALUES (?, ?)",
+                  (scores_data.get("username", "default"), json.dumps(scores_data)))
+    conn.commit()
+    conn.close()
 
-def load_token():
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get("jwt_token")
-    return None
-
-def save_scores(scores_data):
-    with open(SCORES_PATH, "w", encoding="utf-8") as f:
-        json.dump(scores_data, f, ensure_ascii=False, indent=2)
-
-def load_scores():
-    if os.path.exists(SCORES_PATH):
-        with open(SCORES_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return None
+def load_scores(db_path="maimai_dx.db"):
+    """从 SQLite 加载成绩数据"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS scores (user_id TEXT PRIMARY KEY, data TEXT)")
+    cursor.execute("SELECT data FROM scores WHERE user_id = ?", ("default",))
+    result = cursor.fetchone()
+    conn.close()
+    return json.loads(result[0]) if result else None
 
 class LoginDialog(QDialog):
     def __init__(self, parent=None):

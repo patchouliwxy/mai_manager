@@ -1,10 +1,11 @@
-# score_tab.py
 from PyQt5 import Qt
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QFileDialog, QMessageBox, QLineEdit, QLabel
 )
 import requests
+import sqlite3
+import json
 from divingfish_api import fetch_player_scores, login
 from song_data_loader import load_song_data
 from login_dialog import load_scores, LoginDialog
@@ -12,7 +13,7 @@ from login_dialog import load_scores, LoginDialog
 class ScoreQueryTab(QWidget):
     def __init__(self, song_data=None):
         super().__init__()
-        self.song_data = song_data or load_song_data("maidata.json")
+        self.song_data = song_data or load_song_data("maimai_dx.db")
         layout = QVBoxLayout()
 
         self.search_box = QLineEdit()
@@ -83,17 +84,37 @@ class ScoreQueryTab(QWidget):
         if not keyword:
             self.filtered_data = self.score_data
         else:
-            self.filtered_data = [
-                item for item in self.score_data
-                if keyword in item.get("title", "").lower() or
-                   keyword in self.get_artist(item.get("title", ""), item.get("type", "")).lower()
-            ]
+            conn = sqlite3.connect("maimai_dx.db")
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT data FROM scores WHERE user_id = ?
+            """, ("default",))
+            result = cursor.fetchone()
+            conn.close()
+            if result:
+                records = json.loads(result[0]).get("records", [])
+                self.filtered_data = [
+                    item for item in records
+                    if (keyword in item.get("title", "").lower() or
+                        keyword in self.get_artist(item.get("title", ""), item.get("type", "")).lower())
+                ]
+            else:
+                self.filtered_data = []
         self.display_scores(self.filtered_data)
 
     def get_artist(self, title, chart_type):
-        for song in self.song_data:
-            if song.get("title") == title and song.get("chart_type") == chart_type.lower():
-                return song.get("artist", "")
+        conn = sqlite3.connect("maimai_dx.db")
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT data FROM songs WHERE
+            json_extract(data, '$.title') = ? AND
+            json_extract(data, '$.chart_type') = ?
+        """, (title, chart_type.lower()))
+        result = cursor.fetchone()
+        conn.close()
+        if result:
+            song = json.loads(result[0])
+            return song.get("artist", "")
         return ""
 
     def display_scores(self, scores):

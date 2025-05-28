@@ -2,12 +2,12 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QHBoxLayout,
     QVBoxLayout, QLabel, QPushButton, QSpacerItem, QSizePolicy
 )
-from song_data_loader import load_song_data
+from song_data_loader import load_song_data, init_song_data
 from song_tab import SongSearchTab
 from favorite_tab import FavoriteTab
 from score_tab import ScoreQueryTab
 from best50_tab import Best50Tab
-from login_dialog import LoginDialog,load_scores
+from login_dialog import LoginDialog, load_scores
 import sys
 
 class MainWindow(QMainWindow):
@@ -16,8 +16,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("舞萌DX成绩管理系统")
         self.resize(1200, 800)
 
+        # 初始化 SQLite 数据库
+        init_song_data("maimai_dx.db")
         # 导入数据
-        self.song_data = load_song_data("maidata.json")
+        self.song_data = load_song_data("maimai_dx.db")
 
         # 上方工具栏
         top_bar = QWidget()
@@ -68,7 +70,6 @@ class MainWindow(QMainWindow):
     def open_login(self):
         dialog = LoginDialog(self)
         if dialog.exec_():
-            # 登录对话框已处理成绩同步，刷新Best50页面
             if hasattr(self, 'best50_tab'):
                 saved_data = load_scores()
                 if saved_data:

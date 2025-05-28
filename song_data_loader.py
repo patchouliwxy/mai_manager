@@ -1,11 +1,34 @@
 import json
+import sqlite3
+import os
 
-def load_song_data(filepath):
-    with open(filepath, "r", encoding="utf-8") as f:
-        original_data = json.load(f)
+def init_song_data(db_path="maimai_dx.db"):
+    """初始化 SQLite 数据库并导入歌曲数据"""
+    if not os.path.exists(db_path):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS songs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data TEXT
+            )
+        """)
+        with open("maidata.json", "r", encoding="utf-8") as f:
+            original_data = json.load(f)
+            for song in original_data:
+                cursor.execute("INSERT INTO songs (data) VALUES (?)", (json.dumps(song),))
+        conn.commit()
+        conn.close()
+
+def load_song_data(db_path="maimai_dx.db"):
+    """从 SQLite 加载歌曲数据"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT data FROM songs")
+    original_data = [json.loads(row[0]) for row in cursor.fetchall()]
+    conn.close()
 
     split_data = []
-
     for song in original_data:
         std_row = {
             "chart_type": "std",

@@ -1,28 +1,9 @@
-# song_model.py
 import os
-import sys
+import sqlite3
 from PyQt5.QtCore import QAbstractTableModel, Qt
 from PyQt5.QtGui import QPixmap, QIcon
 from favorites_manager import load_favorites
 
-def resource_path(relative_path):
-    """获取打包后的资源路径"""
-    if hasattr(sys, '_MEIPASS'):
-        # PyInstaller 打包后的临时路径
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
-
-class SongTableModel(QAbstractTableModel):
-    def __init__(self, data, image_dir="images"):
-        super().__init__()
-        self._original_data = data
-        self._data = data
-        self.image_dir = resource_path(image_dir)  # 使用动态路径
-        self.headers = [
-            "收藏", "类型", "封面", "标题", "艺术家", "类别", "版本",
-            "Basic", "Advanced", "Expert", "Master", "Re:Mas"
-        ]
-        self.favorites = load_favorites()
 class SongTableModel(QAbstractTableModel):
     def __init__(self, data, image_dir="images"):
         super().__init__()
@@ -74,23 +55,33 @@ class SongTableModel(QAbstractTableModel):
             return self.headers[section]
         return None
 
-    def filter(self, chart_type=None, versions=None, level=None, categories=None, text=""):
-        text = text.lower()
-        self._data = []
-        for s in self._original_data:
-            if chart_type and s.get("chart_type") != chart_type:
-                continue
-            if versions and s.get("version") not in versions:
-                continue
-            if categories and s.get("category") not in categories:
-                continue
-            if level:
-                levels = [s.get(k, "") for k in ["Basic", "Advanced", "Expert", "Master", "Re:Mas"]]
-                if level not in levels:
-                    continue
-            if text and text not in s.get("title", "").lower() and text not in s.get("artist", "").lower():
-                continue
-            self._data.append(s)
+    def filter(self, chart_type=None, versions=None, level=None, categories=None, text="", db_path="maimai_dx.db"):
+        query = "SELECT data FROM songs WHERE 1=1"
+        params = []
+        if chart_type:
+            query += " AND json_extract(data, '$.chart_type') = ?"
+            params.append(chart_type)
+        if versions:
+            query += " AND json_extract(data, '$.version') IN ({})".format(
+                ",".join("?" for _ in versions)
+            )
+            params.extend(versions)
+        if categories:
+            query += " AND json_extract(data, '$.category') IN ({})".format(
+                ",".join("?" for _ in categories)
+            )
+            params.extend(categories)
+        if level:
+            query += " AND (json_extract(data, '$.Basic') = ? OR json_extract(data, '$.Advanced') = ? OR json_extract(data, '$.Expert') = ? OR json_extract(data, '$.Master') = ? OR json_extract(data, '$.Re:Mas') = ?)"
+            params.extend([level] * 5)
+        if text:
+            query += " AND (json_extract(data, '$.title') LIKE ? OR json_extract(data, '$.artist') LIKE ?)"
+            params.extend([f"%{text}%", f"%{text}%"])
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        self._data = [json.loads(row[0]) for row in cursor.fetchall()]
+        conn.close()
         self.layoutChanged.emit()
 
     def get_song(self, row):

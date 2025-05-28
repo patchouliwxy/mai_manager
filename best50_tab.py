@@ -2,16 +2,17 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QFileDialog, QMessageBox, QLabel
 )
-from divingfish_api import fetch_player_scores
+import requests
+import sqlite3
+import json
+from divingfish_api import fetch_player_scores, login
 from song_data_loader import load_song_data
 from login_dialog import load_scores, LoginDialog
-import requests
-
 
 class Best50Tab(QWidget):
     def __init__(self, song_data=None):
         super().__init__()
-        self.song_data = song_data or load_song_data("maidata.json")
+        self.song_data = song_data or load_song_data("maimai_dx.db")
         layout = QVBoxLayout()
 
         self.sync_btn = QPushButton("📡 同步Best50成绩")
@@ -57,15 +58,12 @@ class Best50Tab(QWidget):
 
         for record in records:
             song_version = self.get_song_version(record.get("title", ""), record.get("type", ""))
-
-            # 如果找到了版本信息
             if song_version:
                 if song_version == current_version:
                     new_records.append(record)
                 else:
                     old_records.append(record)
             else:
-                # 如果没有找到版本信息，默认归类为旧版本
                 old_records.append(record)
 
         # 按单曲Rating（ra）降序排序，分别取前35和前15
@@ -79,20 +77,30 @@ class Best50Tab(QWidget):
 
     def get_song_version(self, title, chart_type):
         """根据歌曲标题和谱面类型获取版本"""
-        # 遍历所有歌曲数据寻找匹配的歌曲
-        for song in self.song_data:
-            if (song.get("title", "").strip() == title.strip() and
-                    song.get("chart_type", "").lower() == chart_type.lower()):
-                return song.get("version", "")
+        conn = sqlite3.connect("maimai_dx.db")
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT data FROM songs WHERE
+            json_extract(data, '$.title') = ? AND
+            json_extract(data, '$.chart_type') = ?
+        """, (title.strip(), chart_type.lower()))
+        result = cursor.fetchone()
+        if result:
+            song = json.loads(result[0])
+            conn.close()
+            return song.get("version", "")
 
-        # 如果没有找到精确匹配，尝试模糊匹配（处理可能的标题差异）
-        for song in self.song_data:
-            if (title.strip().lower() in song.get("title", "").strip().lower() or
-                    song.get("title", "").strip().lower() in title.strip().lower()):
-                if song.get("chart_type", "").lower() == chart_type.lower():
-                    return song.get("version", "")
-
-        # 如果仍然没有找到，返回空字符串
+        # 模糊匹配
+        cursor.execute("""
+            SELECT data FROM songs WHERE
+            json_extract(data, '$.title') LIKE ? AND
+            json_extract(data, '$.chart_type') = ?
+        """, (f"%{title.strip()}%", chart_type.lower()))
+        result = cursor.fetchone()
+        conn.close()
+        if result:
+            song = json.loads(result[0])
+            return song.get("version", "")
         return ""
 
     def sync_from_divingfish(self):
@@ -134,11 +142,9 @@ class Best50Tab(QWidget):
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
 
-        # 计算实际需要的行数
         total_rows = len(score_data["old"]) + len(score_data["new"])
-        self.table.setRowCount(max(50, total_rows))  # 至少50行，或者根据实际数据调整
+        self.table.setRowCount(max(50, total_rows))
 
-        # 设置列宽
         self.table.setColumnWidth(0, 60)
         self.table.setColumnWidth(2, 80)
         self.table.setColumnWidth(3, 60)
@@ -148,12 +154,9 @@ class Best50Tab(QWidget):
         self.table.setColumnWidth(10, 100)
 
         current_row = 0
-
-        # 显示旧版本前35首
         for item in score_data["old"]:
             if current_row >= self.table.rowCount():
                 break
-
             self.table.setItem(current_row, 0, QTableWidgetItem(item.get("type", "")))
             self.table.setItem(current_row, 1, QTableWidgetItem(item.get("title", "")))
             self.table.setItem(current_row, 2, QTableWidgetItem(str(item.get("level_index", ""))))
@@ -165,14 +168,11 @@ class Best50Tab(QWidget):
             self.table.setItem(current_row, 8, QTableWidgetItem(item.get("fs", "-")))
             self.table.setItem(current_row, 9, QTableWidgetItem(str(item.get("ra", ""))))
             self.table.setItem(current_row, 10, QTableWidgetItem(str(item.get("dxScore", ""))))
-            version = self.get_song_version(item.get("title", ""), item.get("type", ""))
             current_row += 1
 
-        # 显示舞萌2024前15首
         for item in score_data["new"]:
             if current_row >= self.table.rowCount():
                 break
-
             self.table.setItem(current_row, 0, QTableWidgetItem(item.get("type", "")))
             self.table.setItem(current_row, 1, QTableWidgetItem(item.get("title", "")))
             self.table.setItem(current_row, 2, QTableWidgetItem(str(item.get("level_index", ""))))
@@ -184,7 +184,6 @@ class Best50Tab(QWidget):
             self.table.setItem(current_row, 8, QTableWidgetItem(item.get("fs", "-")))
             self.table.setItem(current_row, 9, QTableWidgetItem(str(item.get("ra", ""))))
             self.table.setItem(current_row, 10, QTableWidgetItem(str(item.get("dxScore", ""))))
-            version = self.get_song_version(item.get("title", ""), item.get("type", ""))
             current_row += 1
 
     def export_csv(self):
@@ -210,10 +209,8 @@ class Best50Tab(QWidget):
                 "成绩百分比", "评级", "FC", "FS", "单曲 Rating", "DX 分数"
             ])
 
-            # 旧版本前35首
             writer.writerow(["旧版本（前35首）"])
             for item in self.score_data["old"]:
-                version = self.get_song_version(item.get("title", ""), item.get("type", ""))
                 writer.writerow([
                     item.get("type", ""),
                     item.get("title", ""),
@@ -225,16 +222,13 @@ class Best50Tab(QWidget):
                     item.get("fc", "-"),
                     item.get("fs", "-"),
                     item.get("ra", ""),
-                    item.get("dxScore", ""),
+                    item.get("dxScore", "")
                 ])
 
-            # 分隔线
             writer.writerow(["--- 分隔线 ---"])
 
-            # 舞萌2024前15首
             writer.writerow(["舞萌2024（前15首）"])
             for item in self.score_data["new"]:
-                version = self.get_song_version(item.get("title", ""), item.get("type", ""))
                 writer.writerow([
                     item.get("type", ""),
                     item.get("title", ""),
@@ -246,7 +240,7 @@ class Best50Tab(QWidget):
                     item.get("fc", "-"),
                     item.get("fs", "-"),
                     item.get("ra", ""),
-                    item.get("dxScore", ""),
+                    item.get("dxScore", "")
                 ])
 
         QMessageBox.information(self, "成功", "Best50 CSV 文件已导出！")
